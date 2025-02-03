@@ -35,6 +35,8 @@ async function login() {
     }
 }
 
-window.addEventListener('click', function(event) {
-   login();
-});
+// window.addEventListener('click', function(event) {
+//    login();
+// });
+
+document.getElementById('login-btn').addEventListener('click', login);
