@@ -39,6 +39,7 @@ async function populate() {
           document.getElementById("user-id").textContent = user.id;
           document.getElementById("user-login").textContent = user.login;
           getUserXpProjects(user.id) 
+          fetchUserSkills();
 
       } else {
           document.getElementById("user-id").textContent = "Error fetching data";
@@ -159,6 +160,81 @@ async function getProjectName(objectId) {
 }
 
 
+
+const skillsQuery = `
+  query GetUserSkills {
+    user {
+      transactions(
+        order_by: [{ type: desc }, { amount: desc }]
+        distinct_on: [type]
+        where: {
+          type: { _in: ["skill_js", "skill_go", "skill_html", "skill_prog", "skill_front-end", "skill_back-end"] }
+        }
+      ) {
+        type
+        amount
+      }
+    }
+  }
+`;
+
+async function fetchUserSkills() {
+  const container = document.getElementById("skills-container");
+  container.innerHTML = "Loading..."; // Show loading message
+
+  try {
+    // API Request
+    const response = await fetch("https://learn.reboot01.com/api/graphql-engine/v1/graphql", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("jwtToken")}` // Authentication token
+      },
+      body: JSON.stringify({ query: skillsQuery }) // Replace 'skillsQuery' with your actual query
+    });
+
+    const result = await response.json();
+    container.innerHTML = ""; // Clear container before displaying results
+
+    // Check if user data exists
+    if (result?.data?.user?.length > 0) {
+      const transactions = result.data.user[0].transactions; // Access transactions for the first user
+      console.log(transactions); // Debugging purpose
+
+      // Check if transactions exist
+      if (transactions && transactions.length > 0) {
+        console.log("Transactions found:", transactions);
+
+        // Display each skill
+        transactions.forEach(skill => {
+          const skillDiv = document.createElement("div");
+          skillDiv.className = "skill";
+          skillDiv.innerHTML = `
+            <div class="skill-type">Skill: ${formatSkillType(skill.type)}</div>
+            <div class="skill-amount">Proficiency: ${skill.amount}</div>
+          `;
+          container.appendChild(skillDiv);
+        });
+
+      } else {
+        console.log("No transactions found.");
+        container.innerHTML = "No skills found.";
+      }
+    } else {
+      console.log("No user data found.");
+      container.innerHTML = "No user data found.";
+    }
+
+  } catch (error) {
+    console.error("Error fetching skills:", error);
+    container.innerHTML = "Failed to load skills. Please try again.";
+  }
+}
+
+// Helper function to format skill types
+function formatSkillType(type) {
+  return type.replace("skill_", "").replace("-", " ").toUpperCase();
+}
 
 
 
