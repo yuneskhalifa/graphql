@@ -1,6 +1,6 @@
 
 
-async function getUserDetails() {
+export async function getUserDetails() {
     console.log("JWT in LocalStorage:", localStorage.getItem("jwtToken"));
   try {
       const response = await fetch("https://learn.reboot01.com/api/graphql-engine/v1/graphql", {
@@ -80,7 +80,7 @@ const objectDetailsQuery = `
 `;
 
 
-async function getProjectName(objectId) {
+export async function getProjectName(objectId) {
     try {
       const response = await fetch("https://learn.reboot01.com/api/graphql-engine/v1/graphql", {
         method: "POST",
@@ -178,6 +178,66 @@ const skillsQuery = `
   }
 `;
 
+// async function fetchUserSkills() {
+//   const container = document.getElementById("skills-container");
+//   container.innerHTML = "Loading..."; // Show loading message
+
+//   try {
+//     // API Request
+//     const response = await fetch("https://learn.reboot01.com/api/graphql-engine/v1/graphql", {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//         "Authorization": `Bearer ${localStorage.getItem("jwtToken")}` // Authentication token
+//       },
+//       body: JSON.stringify({ query: skillsQuery }) // Replace 'skillsQuery' with your actual query
+//     });
+
+//     const result = await response.json();
+//     container.innerHTML = ""; // Clear container before displaying results
+
+//     // Check if user data exists
+//     if (result?.data?.user?.length > 0) {
+//       const transactions = result.data.user[0].transactions; // Access transactions for the first user
+//       console.log(transactions); // Debugging purpose
+
+//       // Check if transactions exist
+//       if (transactions && transactions.length > 0) {
+//         console.log("Transactions found:", transactions);
+
+//         // Display each skill
+//         transactions.forEach(skill => {
+//           const skillDiv = document.createElement("div");
+//           skillDiv.className = "skill";
+//           skillDiv.innerHTML = `
+//             <div class="skill-type">Skill: ${formatSkillType(skill.type)}</div>
+//             <div class="skill-amount">Proficiency: ${skill.amount}</div>
+//           `;
+//           container.appendChild(skillDiv);
+//         });
+
+//       } else {
+//         console.log("No transactions found.");
+//         container.innerHTML = "No skills found.";
+//       }
+//     } else {
+//       console.log("No user data found.");
+//       container.innerHTML = "No user data found.";
+//     }
+
+//   } catch (error) {
+//     console.error("Error fetching skills:", error);
+//     container.innerHTML = "Failed to load skills. Please try again.";
+//   }
+// }
+
+// // Helper function to format skill types
+// function formatSkillType(type) {
+//   return type.replace("skill_", "").replace("-", " ").toUpperCase();
+// }
+
+
+
 async function fetchUserSkills() {
   const container = document.getElementById("skills-container");
   container.innerHTML = "Loading..."; // Show loading message
@@ -190,7 +250,7 @@ async function fetchUserSkills() {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${localStorage.getItem("jwtToken")}` // Authentication token
       },
-      body: JSON.stringify({ query: skillsQuery }) // Replace 'skillsQuery' with your actual query
+      body: JSON.stringify({ query: skillsQuery })
     });
 
     const result = await response.json();
@@ -209,13 +269,15 @@ async function fetchUserSkills() {
         transactions.forEach(skill => {
           const skillDiv = document.createElement("div");
           skillDiv.className = "skill";
-          skillDiv.innerHTML = `
+          skillDiv.innerHTML = `  
             <div class="skill-type">Skill: ${formatSkillType(skill.type)}</div>
             <div class="skill-amount">Proficiency: ${skill.amount}</div>
           `;
           container.appendChild(skillDiv);
         });
 
+        // Create the pie chart
+        createPieChart(transactions);
       } else {
         console.log("No transactions found.");
         container.innerHTML = "No skills found.";
@@ -234,6 +296,91 @@ async function fetchUserSkills() {
 // Helper function to format skill types
 function formatSkillType(type) {
   return type.replace("skill_", "").replace("-", " ").toUpperCase();
+}
+
+// Helper function to create the pie chart
+function createPieChart(skills) {
+  const chartContainer = document.createElement("div");
+  chartContainer.className = "pie-chart-container";
+  chartContainer.style.display = "flex"; // Align chart and legend side by side
+  chartContainer.style.alignItems = "center";
+
+  const chartSize = 200;
+  const center = chartSize / 2;
+  const radius = center - 10;
+
+  const totalProficiency = skills.reduce((acc, skill) => acc + skill.amount, 0);
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", chartSize);
+  svg.setAttribute("height", chartSize);
+  svg.setAttribute("viewBox", `0 0 ${chartSize} ${chartSize}`);
+
+  let startAngle = 0;
+
+  skills.forEach(skill => {
+    const percentage = skill.amount / totalProficiency;
+    const endAngle = startAngle + percentage * 360;
+
+    const largeArcFlag = percentage > 0.5 ? 1 : 0;
+    const startX = center + radius * Math.cos((Math.PI / 180) * startAngle);
+    const startY = center + radius * Math.sin((Math.PI / 180) * startAngle);
+    const endX = center + radius * Math.cos((Math.PI / 180) * endAngle);
+    const endY = center + radius * Math.sin((Math.PI / 180) * endAngle);
+
+    const pathData = `M ${center} ${center} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY} Z`;
+
+    const skillPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    skillPath.setAttribute("d", pathData);
+    skillPath.setAttribute("fill", getSkillColor(skill.type));
+    svg.appendChild(skillPath);
+
+    startAngle = endAngle;
+  });
+
+  // Create the legend container
+  const legendContainer = document.createElement("div");
+  legendContainer.style.marginLeft = "20px"; // Space between chart and legend
+
+  skills.forEach(skill => {
+    const percentage = ((skill.amount / totalProficiency) * 100).toFixed(1); // Calculate percentage
+
+    const legendItem = document.createElement("div");
+    legendItem.style.display = "flex";
+    legendItem.style.alignItems = "center";
+    legendItem.style.marginBottom = "5px";
+
+    const colorBox = document.createElement("div");
+    colorBox.style.width = "15px";
+    colorBox.style.height = "15px";
+    colorBox.style.backgroundColor = getSkillColor(skill.type);
+    colorBox.style.marginRight = "10px";
+
+    const skillLabel = document.createElement("span");
+    skillLabel.textContent = `${skill.type} (${percentage}%)`; // Add percentage next to skill name
+
+    legendItem.appendChild(colorBox);
+    legendItem.appendChild(skillLabel);
+    legendContainer.appendChild(legendItem);
+  });
+
+  chartContainer.appendChild(svg);
+  chartContainer.appendChild(legendContainer);
+  document.body.appendChild(chartContainer);
+}
+
+// Helper function to assign colors to skills
+function getSkillColor(skillType) {
+  const skillColors = {
+    "skill_js": "#f1c40f",
+    "skill_go": "#3498db",
+    "skill_html": "#e74c3c",
+    "skill_prog": "#2ecc71",
+    "skill_front-end": "#9b59b6",
+    "skill_back-end": "#1abc9c"
+  };
+
+  return skillColors[skillType] || "#bdc3c7"; // Default color
 }
 
 
