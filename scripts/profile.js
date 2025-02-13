@@ -54,12 +54,29 @@ async function populate() {
 
 
   
-  const userTransactionQuery = `
+//   const userTransactionQuery = `
+//   query GetTransactionData($userId: Int!) {
+//     transaction(where: { type: { _eq: "xp" }, userId: { _eq: $userId } },
+//     order_by: { createdAt: desc },  
+//       limit: 5                        
+//       ) {
+//       id
+//       type
+//       amount
+//       objectId
+//       userId
+//       createdAt
+//       path
+//     }
+//   }
+// `;
+
+const userTransactionQuery = `
   query GetTransactionData($userId: Int!) {
-    transaction(where: { type: { _eq: "xp" }, userId: { _eq: $userId } },
-    order_by: { createdAt: desc },  
-      limit: 5                        
-      ) {
+    transaction(
+      where: { type: { _eq: "xp" }, userId: { _eq: $userId } },
+      order_by: { createdAt: desc }
+    ) {
       id
       type
       amount
@@ -71,45 +88,47 @@ async function populate() {
   }
 `;
 
+
 const objectDetailsQuery = `
-  query GetObjectName($objectId: Int!) {
-    object(where: { id: { _eq: $objectId }, type: { _eq: "project" } }) {
+  query GetObjectNames($objectIds: [Int!]!) {
+    object(where: { id: { _in: $objectIds }, type: { _eq: "project" } }) {
+      id
       name
     }
   }
 `;
 
+async function getProjectNames(objectIds) {
+  if (!objectIds.length) return new Map(); // Return empty map if no IDs provided
 
-export async function getProjectName(objectId) {
-    try {
-      const response = await fetch("https://learn.reboot01.com/api/graphql-engine/v1/graphql", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("jwtToken")}`
-        },
-        body: JSON.stringify({
-          query: objectDetailsQuery,
-          variables: { objectId }
-        })
-      });
-      const data = await response.json();
-      if (data && data.data && data.data.object.length > 0) {
-        return data.data.object[0].name; // Return the project name
-      } else {
-        console.log("Project name not found");
-        return "Unknown Project"; // Return a default name if not found
-      }
-    } catch (error) {
-      console.error("Error fetching project name:", error);
-      return "Error Fetching Name";
+  try {
+    const response = await fetch("https://learn.reboot01.com/api/graphql-engine/v1/graphql", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("jwtToken")}`
+      },
+      body: JSON.stringify({
+        query: objectDetailsQuery,
+        variables: { objectIds }
+      })
+    });
+
+    const data = await response.json();
+
+    if (data && data.data && data.data.object.length > 0) {
+      return new Map(data.data.object.map(proj => [proj.id, proj.name])); // Return a map of projectId → name
     }
+  } catch (error) {
+    console.error("Error fetching project names:", error);
   }
-  
 
+  return new Map(); // Return empty map if error occurs
+}
 
-  async function getUserXpProjects(userId) {
-    console.log("JWT in LocalStorage:", localStorage.getItem("jwtToken"));
+async function getUserXpProjects(userId) {
+  console.log("JWT in LocalStorage:", localStorage.getItem("jwtToken"));
+
   try {
     const response = await fetch("https://learn.reboot01.com/api/graphql-engine/v1/graphql", {
       method: "POST",
@@ -128,29 +147,45 @@ export async function getProjectName(objectId) {
     if (data && data.data && data.data.transaction.length > 0) {
       console.log("Retrieved data");
 
-      // Get the container where the projects will be displayed
       const projectsContainer = document.getElementById("projects-container");
+      projectsContainer.innerHTML = ""; // Clear previous data
 
-      // Loop through the transactions (last 5)
-      const lastFiveTransactions = data.data.transaction.slice(0, 5);
-      for (let tx of lastFiveTransactions) {
-        // Fetch the project name based on the objectId
-        const projectName = await getProjectName(tx.objectId);
+      const transactions = data.data.transaction;
 
-        // Create a new div for each project
-        const projectDiv = document.createElement("div");
+      // ✅ Calculate Total XP
+      const totalXp = transactions.reduce((sum, tx) => sum + tx.amount, 0);
+      projectsContainer.innerHTML += `<h3>Total XP Earned: ${totalXp}</h3>`;
 
-        // Populate the content for each project
-        projectDiv.innerHTML = `
-          <p><strong>Project Name:</strong> ${projectName}</p>
-          <p><strong>Project ID:</strong> ${tx.objectId}</p>
-          <p><strong>XP Earned:</strong> ${tx.amount}</p>
-          <p><strong>Date:</strong> ${new Date(tx.createdAt).toLocaleDateString()}</p>
-        `;
+      // ✅ Collect All Unique Project IDs
+      const uniqueProjectIds = [...new Set(transactions.map(tx => tx.objectId))];
 
-        // Append the project div to the container
-        projectsContainer.appendChild(projectDiv);
-      }
+      // ✅ Fetch All Project Names in One API Call
+      const projectNameMap = await getProjectNames(uniqueProjectIds);
+
+      // ✅ Prepare Data for Pie Chart
+      const projectData = transactions
+        .filter(tx => projectNameMap.has(tx.objectId)) // Ignore unknown projects
+        .map(tx => ({ name: projectNameMap.get(tx.objectId), xp: tx.amount }));
+      console.log(projectData);
+      console.log(projectNameMap);
+      // ✅ Draw the Pie Chart
+     
+
+      // ✅ Display Last 5 Projects
+      transactions.slice(0, 5).forEach(tx => {
+        if (projectNameMap.has(tx.objectId)) {
+          projectsContainer.innerHTML += `
+            <div>
+              <p><strong>Project Name:</strong> ${projectNameMap.get(tx.objectId)}</p>
+            
+              <p><strong>XP Earned:</strong> ${tx.amount}</p>
+              <p><strong>Date:</strong> ${new Date(tx.createdAt).toLocaleDateString()}</p>
+              <hr>
+            </div>
+          `;
+        }
+      });
+      createPieChart1(projectData, projectsContainer);
     } else {
       console.log("No data retrieved");
     }
@@ -158,6 +193,92 @@ export async function getProjectName(objectId) {
     console.error("Error fetching user details:", error);
   }
 }
+
+function createPieChart1(projects, container) {
+  const chartSize = 300;
+  const center = chartSize / 2;
+  const radius = center - 20;
+
+  const totalXp = projects.reduce((sum, project) => sum + project.xp, 0);
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", chartSize);
+  svg.setAttribute("height", chartSize);
+  svg.style.border = "1px solid #ccc";
+  svg.style.position = "relative"; // Make sure positioning is relative
+
+  // ✅ Tooltip for Hover
+  const tooltip = document.createElement("div");
+  tooltip.style.position = "absolute";
+  tooltip.style.padding = "5px 10px";
+  tooltip.style.background = "#333";
+  tooltip.style.color = "#fff";
+  tooltip.style.borderRadius = "5px";
+  tooltip.style.display = "none";
+  tooltip.style.pointerEvents = "none";
+  tooltip.style.zIndex = "1000"; // Ensure tooltip is above everything
+  container.appendChild(tooltip);
+
+  let startAngle = 0;
+
+  projects.forEach((project, index) => {
+    const percentage = project.xp / totalXp;
+    const endAngle = startAngle + percentage * 360;
+
+    const largeArcFlag = percentage > 0.5 ? 1 : 0;
+    const startX = center + radius * Math.cos((Math.PI / 180) * startAngle);
+    const startY = center + radius * Math.sin((Math.PI / 180) * startAngle);
+    const endX = center + radius * Math.cos((Math.PI / 180) * endAngle);
+    const endY = center + radius * Math.sin((Math.PI / 180) * endAngle);
+
+    const pathData = `M ${center} ${center} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY} Z`;
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", pathData);
+    path.setAttribute("fill", getColor(index));
+    path.style.cursor = "pointer";
+
+    // ✅ Add Debugging to check if path is being created
+    //console.log("Creating path for:", project.name, "XP:", project.xp);
+
+    // ✅ Hover Effect with Debugging
+    path.addEventListener("mouseover", () => {
+      console.log("Mouse over detected on path:", project.name, project.xp);  // Log to check if event fires correctly
+      tooltip.style.display = "block";
+      tooltip.textContent = `${project.name}: ${project.xp} XP`;
+    });
+
+    path.addEventListener("mousemove", (e) => {
+      console.log("Mousemove detected:", e.pageX, e.pageY);  // Log mouse position to check if move event fires
+      const tooltipWidth = tooltip.offsetWidth;
+      const tooltipHeight = tooltip.offsetHeight;
+
+      const xPosition = e.pageX + 10;
+      const yPosition = e.pageY - tooltipHeight - 10;
+
+      tooltip.style.left = `${xPosition}px`;
+      tooltip.style.top = `${yPosition}px`;
+    });
+
+    path.addEventListener("mouseout", () => {
+      tooltip.style.display = "none";
+    });
+
+    svg.appendChild(path);
+    startAngle = endAngle;
+  });
+
+  container.appendChild(svg);
+}
+
+
+// ✅ Color Generator
+function getColor(index) {
+  const colors = ["#f39c12", "#e74c3c", "#8e44ad", "#3498db", "#2ecc71", "#1abc9c"];
+  return colors[index % colors.length];
+}
+
+// end of test
 
 
 
@@ -388,4 +509,57 @@ function getSkillColor(skillType) {
 window.onload = populate;
 
 
+
+
+
+//   async function getUserXpProjects(userId) {
+//     console.log("JWT in LocalStorage:", localStorage.getItem("jwtToken"));
+//   try {
+//     const response = await fetch("https://learn.reboot01.com/api/graphql-engine/v1/graphql", {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//         "Authorization": `Bearer ${localStorage.getItem("jwtToken")}`
+//       },
+//       body: JSON.stringify({
+//         query: userTransactionQuery,
+//         variables: { userId }
+//       })
+//     });
+
+//     const data = await response.json();
+
+//     if (data && data.data && data.data.transaction.length > 0) {
+//       console.log("Retrieved data");
+
+//       // Get the container where the projects will be displayed
+//       const projectsContainer = document.getElementById("projects-container");
+
+//       // Loop through the transactions (last 5)
+//       const lastFiveTransactions = data.data.transaction.slice(0, 5);
+//       for (let tx of lastFiveTransactions) {
+//         // Fetch the project name based on the objectId
+//         const projectName = await getProjectName(tx.objectId);
+
+//         // Create a new div for each project
+//         const projectDiv = document.createElement("div");
+
+//         // Populate the content for each project
+//         projectDiv.innerHTML = `
+//           <p><strong>Project Name:</strong> ${projectName}</p>
+//           <p><strong>Project ID:</strong> ${tx.objectId}</p>
+//           <p><strong>XP Earned:</strong> ${tx.amount}</p>
+//           <p><strong>Date:</strong> ${new Date(tx.createdAt).toLocaleDateString()}</p>
+//         `;
+
+//         // Append the project div to the container
+//         projectsContainer.appendChild(projectDiv);
+//       }
+//     } else {
+//       console.log("No data retrieved");
+//     }
+//   } catch (error) {
+//     console.error("Error fetching user details:", error);
+//   }
+// }
 
