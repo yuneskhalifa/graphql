@@ -326,7 +326,7 @@ async function fetchUserSkills() {
         });
 
         // Create the pie chart
-        createPieChart(transactions);
+        createBarChart(transactions);
       } else {
         console.log("No transactions found.");
         container.innerHTML = "No skills found.";
@@ -347,95 +347,63 @@ function formatSkillType(type) {
   return type.replace("skill_", "").replace("-", " ").toUpperCase();
 }
 
-
-function createPieChart(skills) {
+function createBarChart(skills) {
   const chartWrapper = document.createElement("div");
   chartWrapper.className = "chart-wrapper";
-
-  // Center the chart container using flexbox
   chartWrapper.style.display = "flex";
-  chartWrapper.style.flexDirection = "column"; 
-  chartWrapper.style.alignItems = "center"; 
-  chartWrapper.style.justifyContent = "center"; 
-  chartWrapper.style.margin = "20px auto"; 
-  chartWrapper.style.textAlign = "center"; 
+  chartWrapper.style.flexDirection = "column";
+  chartWrapper.style.alignItems = "center";
+  chartWrapper.style.margin = "20px auto";
+  chartWrapper.style.textAlign = "center";
+  chartWrapper.style.width = "400px";
 
   // Create heading above the chart
   const heading = document.createElement("h1");
   heading.textContent = "The Skills Chart";
-  heading.style.marginBottom = "10px"; // Space between title & chart
+  heading.style.marginBottom = "10px";
 
+  // Create chart container
   const chartContainer = document.createElement("div");
-  chartContainer.className = "pie-chart-container";
-  chartContainer.style.display = "flex"; // Align chart and legend side by side
-  chartContainer.style.alignItems = "center";
-
-  const chartSize = 200;
-  const center = chartSize / 2;
-  const radius = center - 10;
+  chartContainer.className = "bar-chart-container";
+  chartContainer.style.display = "flex";
+  chartContainer.style.flexDirection = "column";
+  chartContainer.style.width = "100%";
+  chartContainer.style.background = "#f5f5f5";
+  chartContainer.style.padding = "10px";
+  chartContainer.style.border = "1px solid #ccc";
+  chartContainer.style.borderRadius = "5px";
 
   const totalProficiency = skills.reduce((acc, skill) => acc + skill.amount, 0);
 
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", chartSize);
-  svg.setAttribute("height", chartSize);
-  svg.setAttribute("viewBox", `0 0 ${chartSize} ${chartSize}`);
-
-  let startAngle = 0;
-
-  skills.forEach(skill => {
-    const percentage = skill.amount / totalProficiency;
-    const endAngle = startAngle + percentage * 360;
-
-    const largeArcFlag = percentage > 0.5 ? 1 : 0;
-    const startX = center + radius * Math.cos((Math.PI / 180) * startAngle);
-    const startY = center + radius * Math.sin((Math.PI / 180) * startAngle);
-    const endX = center + radius * Math.cos((Math.PI / 180) * endAngle);
-    const endY = center + radius * Math.sin((Math.PI / 180) * endAngle);
-
-    const pathData = `M ${center} ${center} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY} Z`;
-
-    const skillPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    skillPath.setAttribute("d", pathData);
-    skillPath.setAttribute("fill", getSkillColor(skill.type));
-    svg.appendChild(skillPath);
-
-    startAngle = endAngle;
-  });
-
-  // Create the legend container
-  const legendContainer = document.createElement("div");
-  legendContainer.style.marginLeft = "20px"; // Space between chart and legend
-
   skills.forEach(skill => {
     const percentage = ((skill.amount / totalProficiency) * 100).toFixed(1);
-
-    const legendItem = document.createElement("div");
-    legendItem.style.display = "flex";
-    legendItem.style.alignItems = "center";
-    legendItem.style.marginBottom = "5px";
-
-    const colorBox = document.createElement("div");
-    colorBox.style.width = "15px";
-    colorBox.style.height = "15px";
-    colorBox.style.backgroundColor = getSkillColor(skill.type);
-    colorBox.style.marginRight = "10px";
-
+    
+    const barWrapper = document.createElement("div");
+    barWrapper.style.display = "flex";
+    barWrapper.style.alignItems = "center";
+    barWrapper.style.marginBottom = "8px";
+    
     const skillLabel = document.createElement("span");
     skillLabel.textContent = `${skill.type} (${percentage}%)`;
-
-    legendItem.appendChild(colorBox);
-    legendItem.appendChild(skillLabel);
-    legendContainer.appendChild(legendItem);
+    skillLabel.style.width = "100px";
+    skillLabel.style.fontSize = "14px";
+    skillLabel.style.marginRight = "10px";
+    
+    const bar = document.createElement("div");
+    bar.style.height = "20px";
+    bar.style.width = `${percentage}%`;
+    bar.style.backgroundColor = getSkillColor(skill.type);
+    bar.style.borderRadius = "5px";
+    
+    barWrapper.appendChild(skillLabel);
+    barWrapper.appendChild(bar);
+    chartContainer.appendChild(barWrapper);
   });
-
-  chartContainer.appendChild(svg);
-  chartContainer.appendChild(legendContainer);
 
   // Append everything to the wrapper
   chartWrapper.appendChild(heading);
   chartWrapper.appendChild(chartContainer);
-  
+
   // Append to body
   document.body.appendChild(chartWrapper);
 }
