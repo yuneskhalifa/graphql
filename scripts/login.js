@@ -72,7 +72,7 @@ async function login() {
         console.log("Response received.");  // ✅ Debug log
         
         if (!response.ok) {
-            throw new Error(`Login failed. Status: ${response.status}`);
+            throw new Error(`Login failed. Incorrect username or password Status: ${response.status}`);
         }
 
         const data = await response.json();

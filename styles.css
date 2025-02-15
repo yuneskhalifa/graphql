@@ -110,4 +110,38 @@ svg {
   h1 {
     text-align: center;  
     color: #f44336;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   }
+
+
+  #title {
+    text-align: center;
+    width: 100%;
+    color: #fff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 3rem;
+    background: linear-gradient(90deg, #f44336, #ff9800);
+    -webkit-background-clip: text;
+    background-clip: text;
+    text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.3);
+    letter-spacing: 2px;
+    animation: shine 2s infinite alternate;
+    margin-left: 55px;
+}
+
+@keyframes shine {
+    0% {
+        color: #ff9800;
+    }
+    100% {
+        color: #f44336;
+    }
+}
+
+#some {
+    display: flex;
+    justify-content: center; /* Centers content horizontally */
+    align-items: center; /* Centers content vertically */
+    gap: 10px; /* Adds space between title and button */
+}
+
